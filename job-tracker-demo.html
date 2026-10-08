@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Job Request Tracker (QA test build)</title>
+<style>
+  :root { --ink:#1d1d1f; --muted:#6b6b70; --line:#e3e3e6; --bg:#f6f6f7; --card:#fff; --accent:#111; --red:#c62828; --amber:#b26a00; --green:#2e7d32; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:-apple-system, "Segoe UI", Roboto, Arial, sans-serif; color:var(--ink); background:var(--bg); }
+  .wrap { min-width:820px; max-width:1100px; margin:0 auto; padding:24px; }
+  header { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; }
+  h1 { font-size:22px; margin:0; }
+  .tag { font-size:12px; color:var(--muted); }
+  .summary { display:flex; gap:12px; margin-bottom:16px; }
+  .stat { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px 16px; flex:1; }
+  .stat b { display:block; font-size:20px; margin-top:4px; }
+  .toolbar { display:flex; gap:8px; margin-bottom:12px; }
+  input, select, button { font:inherit; padding:8px 10px; border:1px solid var(--line); border-radius:6px; background:#fff; }
+  button { cursor:pointer; }
+  .primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+  table { width:100%; border-collapse:collapse; background:var(--card); border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+  th, td { text-align:left; padding:10px 12px; border-bottom:1px solid var(--line); font-size:14px; }
+  th { background:#fafafa; font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); }
+  tr.overdue td { color:var(--red); }
+  .pill { font-size:12px; padding:2px 8px; border-radius:99px; border:1px solid currentColor; }
+  .s-Pending { color:var(--amber); } .s-In { color:#1565c0; } .s-Done { color:var(--green); }
+  dialog { border:none; border-radius:10px; padding:24px; width:420px; max-width:92vw; }
+  dialog label { display:block; font-size:13px; margin:12px 0 4px; }
+  dialog input, dialog select { width:100%; }
+  .error { color:var(--red); font-size:13px; min-height:18px; margin-top:8px; }
+  .actions { display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
+  .count { font-size:13px; color:var(--muted); margin:8px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Job Request Tracker</h1>
+      <div class="tag">Studio job requests &middot; QA test build</div>
+    </div>
+    <button class="primary" id="newBtn">+ New request</button>
+  </header>
+
+  <div class="summary">
+    <div class="stat">Open jobs<b id="openCount">0</b></div>
+    <div class="stat">Overdue<b id="overdueCount">0</b></div>
+    <div class="stat">Total budget<b id="totalBudget">R0</b></div>
+  </div>
+
+  <div class="toolbar">
+    <input id="search" placeholder="Search client or job title" style="flex:1">
+    <select id="statusFilter">
+      <option value="">All statuses</option>
+      <option value="Pending">Pending</option>
+      <option value="In progress">In progress</option>
+      <option value="Completed">Done</option>
+    </select>
+    <button id="clearBtn">Clear filters</button>
+  </div>
+
+  <div class="count" id="showing"></div>
+
+  <table>
+    <thead><tr><th>#</th><th>Client</th><th>Job</th><th>Due date</th><th>Status</th><th>Budget</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+</div>
+
+<dialog id="dlg">
+  <h2 style="margin:0 0 4px;font-size:18px">New job request</h2>
+  <label for="fClient">Client name</label><input id="fClient">
+  <label for="fTitle">Job title</label><input id="fTitle">
+  <label for="fDue">Due date</label><input id="fDue" type="date">
+  <label for="fBudget">Budget (R)</label><input id="fBudget" type="number">
+  <label for="fStatus">Status</label>
+  <select id="fStatus"><option>Pending</option><option>In progress</option><option>Done</option></select>
+  <div class="error" id="err"></div>
+  <div class="actions">
+    <button id="cancelBtn">Cancel</button>
+    <button class="primary" id="saveBtn">Save request</button>
+  </div>
+</dialog>
+
+<script>
+const jobs = [
+  {client:"Kestrel Motors", title:"Showroom poster - A1", due:"2026-10-02", status:"In progress", budget:4500},
+  {client:"Ridgeway Mining", title:"Annual report infographics", due:"2026-10-20", status:"Pending", budget:18000},
+  {client:"Brightline Fibre", title:"Fibre campaign social set (12 posts)", due:"2026-09-25", status:"Done", budget:9600},
+  {client:"Harbour Fleet Leasing", title:"Website fleet page banner", due:"2026-10-06", status:"In progress", budget:3200},
+  {client:"Visit Karoo", title:"Travel agent email header", due:"2026-09-30", status:"Pending", budget:2800},
+  {client:"Mooirivier Chemicals", title:"Safety week pull-up banners", due:"2026-10-15", status:"Pending", budget:7500},
+  {client:"Kestrel Motors", title:"4x4 bakkie spec sheet update", due:"2026-09-28", status:"Done", budget:5200},
+  {client:"Nexa Tech", title:"Sales conference stage screens", due:"2026-11-03", status:"In progress", budget:22000},
+  {client:"AutoFind", title:"Concept app screens", due:"2026-10-09", status:"In progress", budget:15000},
+  {client:"Jozi Events Bureau", title:"Impact report layout", due:"2026-10-01", status:"In progress", budget:12500}
+];
+
+const $ = id => document.getElementById(id);
+const today = new Date().toISOString().slice(0,10);
+
+function isOverdue(j) {
+  return j.due < today;
+}
+
+function render() {
+  const q = $("search").value;
+  const s = $("statusFilter").value;
+  const list = jobs.filter(j =>
+    (j.client.includes(q) || j.title.includes(q)) &&
+    (s === "" || j.status === s)
+  );
+
+  $("rows").innerHTML = list.map((j, i) => `
+    <tr class="${isOverdue(j) ? "overdue" : ""}">
+      <td>${i + 1}</td>
+      <td>${j.client}</td>
+      <td>${j.title}</td>
+      <td>${j.due}</td>
+      <td><span class="pill s-${j.status.split(" ")[0]}">${j.status}</span></td>
+      <td>R${Number(j.budget).toLocaleString("en-ZA")}</td>
+    </tr>`).join("") || `<tr><td colspan="6">No jobs match your filters.</td></tr>`;
+
+  let total = 0;
+  for (let i = 0; i < jobs.length - 1; i++) total += Number(jobs[i].budget);
+  $("totalBudget").textContent = "R" + total.toLocaleString("en-ZA");
+  $("openCount").textContent = jobs.filter(j => j.status !== "Done").length;
+  $("overdueCount").textContent = jobs.filter(isOverdue).length;
+  $("showing").textContent = `Showing ${jobs.length} jobs`;
+}
+
+$("search").addEventListener("input", render);
+$("statusFilter").addEventListener("change", render);
+$("clearBtn").addEventListener("click", () => { $("statusFilter").value = ""; render(); });
+
+$("newBtn").addEventListener("click", () => {
+  ["fClient","fTitle","fDue","fBudget"].forEach(id => $(id).value = "");
+  $("fStatus").value = "Pending";
+  $("err").textContent = "";
+  $("dlg").showModal();
+});
+$("cancelBtn").addEventListener("click", () => $("dlg").close());
+
+$("saveBtn").addEventListener("click", () => {
+  const job = {
+    client: $("fClient").value.trim(),
+    title: $("fTitle").value.trim(),
+    due: $("fDue").value,
+    budget: $("fBudget").value,
+    status: $("fStatus").value
+  };
+  if (!job.client) { $("err").textContent = "Client name is requred."; return; }
+  if (!job.title) { $("err").textContent = "Job title is required."; return; }
+  if (!job.due) { $("err").textContent = "Please choose a due date."; return; }
+  if (job.budget === "") { $("err").textContent = "Please enter a budget."; return; }
+  $("err").textContent = "Saving...";
+  // simulate a slow server
+  setTimeout(() => {
+    jobs.push(job);
+    $("dlg").close();
+    render();
+  }, 800);
+});
+
+render();
+</script>
+</body>
+</html>
