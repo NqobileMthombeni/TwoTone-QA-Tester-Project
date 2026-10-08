@@ -83,7 +83,9 @@ The supplied `job-tracker-demo.html` contains known bugs, so **two of the three 
 | Total budget summary includes every job | FAIL (shows R87,800, expected R100,300) | BUG-01 |
 | Selecting Done displays completed jobs | FAIL (no rows shown) | BUG-02 |
 
-`mvn test` will therefore report 2 failures and end with `BUILD FAILURE`. This is the correct outcome for the current build. Once the bugs are fixed, all three tests should pass.
+`mvn test` is expected to report 1 passing scenario and 2 failing scenarios, resulting in `BUILD FAILURE`. This is the expected outcome for the current build because the automated tests are intentionally detecting the known defects.
+
+Once the underlying application bugs are fixed, all three scenarios should pass.
 
 ## Reporting
 
@@ -92,11 +94,21 @@ The project is configured to generate:
 * Cucumber HTML report in `target/cucumber-reports/cucumber.html`
 * Allure results in `target/allure-results`
 
-You can also generate the Allure report with:
+Run the tests first so there are results to report, then use one of these:
+
+To generate the Allure report and open it in your browser:
+
+```
+mvn allure:serve
+```
+
+To generate the report files only (output in `target/site/allure-maven-plugin`):
 
 ```
 mvn allure:report
 ```
+
+Note: `allure:report` only builds the report from the last test run. Opening its `index.html` directly can show a blank page, so `allure:serve` is the recommended option. Allure may download its report tool the first time, so an internet connection is needed. The Cucumber HTML report opens directly in the browser without any extra steps.
 
 ## Notes
 
